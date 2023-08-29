@@ -73,6 +73,7 @@ type CustomPayload struct {
 	Text                  string `json:"text"`
 	DisableNotification   bool   `json:"disable_notification,omitempty"`
 	DisableWebPagePreview bool   `json:"disable_web_page_preview,omitempty"`
+	ParseMode             string `json:"parse_mode,omitempty"`
 }
 
 // ========================================
@@ -111,6 +112,7 @@ func (n *Notifier) Notify(ctx context.Context, alert ...*types.Alert) (bool, err
 			Text:                  messageText,
 			DisableNotification:   n.conf.DisableNotifications,
 			DisableWebPagePreview: true,
+			ParseMode:             "HTML",
 		})
 
 		if err != nil {
