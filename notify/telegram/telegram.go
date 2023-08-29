@@ -15,6 +15,8 @@ package telegram
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -64,6 +66,17 @@ func New(conf *config.TelegramConfig, t *template.Template, l log.Logger, httpOp
 	}, nil
 }
 
+// ========================================
+type CustomPayload struct {
+	ChatID                int64  `json:"chat_id"`
+	MessageThreadID       int64  `json:"message_thread_id,omitempty"`
+	Text                  string `json:"text"`
+	DisableNotification   bool   `json:"disable_notification,omitempty"`
+	DisableWebPagePreview bool   `json:"disable_web_page_preview,omitempty"`
+}
+
+// ========================================
+
 func (n *Notifier) Notify(ctx context.Context, alert ...*types.Alert) (bool, error) {
 	var (
 		err  error
@@ -89,6 +102,41 @@ func (n *Notifier) Notify(ctx context.Context, alert ...*types.Alert) (bool, err
 	if err != nil {
 		return true, err
 	}
+
+	// ========================================
+	if n.conf.MessageThreadID != 0 {
+		res, err := n.client.Raw("sendMessage", CustomPayload{
+			ChatID:                n.conf.ChatID,
+			MessageThreadID:       n.conf.MessageThreadID,
+			Text:                  messageText,
+			DisableNotification:   n.conf.DisableNotifications,
+			DisableWebPagePreview: true,
+		})
+
+		if err != nil {
+			return true, err
+		}
+
+		type resp struct {
+			Ok     bool
+			Result *telebot.Message
+		}
+
+		var r resp
+
+		if err := json.Unmarshal(res, &r); err != nil {
+			return true, err
+		}
+
+		if !r.Ok {
+			return true, errors.New("ok not true")
+		}
+
+		level.Debug(n.logger).Log("msg", "Telegram message successfully published", "message_id", r.Result.ID, "chat_id", r.Result.Chat.ID)
+
+		return false, nil
+	}
+	// ========================================
 
 	message, err := n.client.Send(telebot.ChatID(n.conf.ChatID), messageText, &telebot.SendOptions{
 		DisableNotification:   n.conf.DisableNotifications,
